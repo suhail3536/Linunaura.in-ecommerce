@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+const API_URL = "https://linunaura-in-ecommerce.onrender.com/api";
 
 function money(value) {
   return `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
