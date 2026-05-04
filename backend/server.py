@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer, Flask
 from pathlib import Path
 from urllib.parse import urlparse
 import hashlib
@@ -9,12 +9,14 @@ import time
 import uuid
 
 
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 PRODUCTS_FILE = DATA_DIR / "products.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "linunaura123")
 SECRET_KEY = os.environ.get("SECRET_KEY", "linunaura-local-secret")
 TOKEN_TTL_SECONDS = 60 * 60 * 8
+app = Flask(__name__)
 
 
 SEED_PRODUCTS = [
