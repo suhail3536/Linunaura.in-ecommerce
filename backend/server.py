@@ -1,6 +1,5 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer, Flask
 from pathlib import Path
-from urllib.parse import urlparse
+from flask import Flask, request, jsonify
 import hashlib
 import hmac
 import json
@@ -8,16 +7,15 @@ import os
 import time
 import uuid
 
-
-
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 PRODUCTS_FILE = DATA_DIR / "products.json"
+
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "linunaura123")
 SECRET_KEY = os.environ.get("SECRET_KEY", "linunaura-local-secret")
 TOKEN_TTL_SECONDS = 60 * 60 * 8
-app = Flask(__name__)
 
+app = Flask(__name__)
 
 SEED_PRODUCTS = [
     {
@@ -105,70 +103,92 @@ SEED_PRODUCTS = [
 
 def ensure_data_file():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
     if not PRODUCTS_FILE.exists():
         save_products(SEED_PRODUCTS)
 
 
 def load_products():
     ensure_data_file()
+
     with PRODUCTS_FILE.open("r", encoding="utf-8") as file:
         return json.load(file)
 
 
 def save_products(products):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
     with PRODUCTS_FILE.open("w", encoding="utf-8") as file:
         json.dump(products, file, indent=2)
 
 
-def json_response(handler, payload, status=200):
-    body = json.dumps(payload).encode("utf-8")
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Access-Control-Allow-Origin", "*")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token")
-    handler.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-    handler.end_headers()
-    handler.wfile.write(body)
-
-
-def read_json(handler):
-    length = int(handler.headers.get("Content-Length", "0"))
-    if length == 0:
-        return {}
-    raw = handler.rfile.read(length)
-    return json.loads(raw.decode("utf-8"))
-
-
 def make_token():
     expires = int(time.time()) + TOKEN_TTL_SECONDS
+
     payload = f"admin:{expires}"
-    signature = hmac.new(SECRET_KEY.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    signature = hmac.new(
+        SECRET_KEY.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
     return f"{payload}:{signature}"
 
 
 def verify_token(token):
     try:
         role, expires, signature = token.split(":")
+
         payload = f"{role}:{expires}"
-        expected = hmac.new(SECRET_KEY.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
-        return role == "admin" and int(expires) >= int(time.time()) and hmac.compare_digest(signature, expected)
+
+        expected = hmac.new(
+            SECRET_KEY.encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        return (
+            role == "admin"
+            and int(expires) >= int(time.time())
+            and hmac.compare_digest(signature, expected)
+        )
+
     except (ValueError, TypeError):
         return False
 
 
 def normalize_product(data, existing_id=None):
-    required = ["name", "category", "price", "stock", "color", "size", "material", "image", "description"]
-    missing = [field for field in required if data.get(field) in (None, "")]
+    required = [
+        "name",
+        "category",
+        "price",
+        "stock",
+        "color",
+        "size",
+        "material",
+        "image",
+        "description"
+    ]
+
+    missing = [
+        field for field in required
+        if data.get(field) in (None, "")
+    ]
+
     if missing:
-        raise ValueError(f"Missing required field: {', '.join(missing)}")
+        raise ValueError(
+            f"Missing required field: {', '.join(missing)}"
+        )
 
     price = int(float(data["price"]))
     mrp = int(float(data.get("mrp") or price))
     stock = int(float(data["stock"]))
+
     if price < 0 or mrp < 0 or stock < 0:
-        raise ValueError("Price, MRP, and stock must be positive numbers")
+        raise ValueError(
+            "Price, MRP, and stock must be positive numbers"
+        )
 
     return {
         "id": existing_id or data.get("id") or str(uuid.uuid4()),
@@ -188,106 +208,152 @@ def normalize_product(data, existing_id=None):
     }
 
 
-class LinunauraHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        return
+@app.after_request
+def cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Admin-Token"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        self.end_headers()
+    return response
 
-    def do_GET(self):
-        path = urlparse(self.path).path
-        if path == "/api/health":
-            json_response(self, {"status": "ok", "name": "Linunaura.in"})
-            return
-        if path == "/api/products":
-            json_response(self, load_products())
-            return
-        json_response(self, {"error": "Not found"}, 404)
 
-    def do_POST(self):
-        path = urlparse(self.path).path
-        if path == "/api/admin/login":
-            payload = read_json(self)
-            if hmac.compare_digest(str(payload.get("password", "")), ADMIN_PASSWORD):
-                json_response(self, {"token": make_token()})
-            else:
-                json_response(self, {"error": "Invalid admin password"}, 401)
-            return
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "name": "Linunaura.in"
+    })
 
-        if path == "/api/products":
-            if not self.is_admin():
-                return
-            try:
-                product = normalize_product(read_json(self))
-                products = load_products()
-                products.insert(0, product)
-                save_products(products)
-                json_response(self, product, 201)
-            except (ValueError, json.JSONDecodeError) as error:
-                json_response(self, {"error": str(error)}, 400)
-            return
 
-        json_response(self, {"error": "Not found"}, 404)
+@app.route("/api/products", methods=["GET"])
+def get_products():
+    return jsonify(load_products())
 
-    def do_PUT(self):
-        path = urlparse(self.path).path
-        product_id = path.removeprefix("/api/products/")
-        if not product_id or product_id == path:
-            json_response(self, {"error": "Not found"}, 404)
-            return
-        if not self.is_admin():
-            return
 
-        try:
-            products = load_products()
-            index = next((position for position, item in enumerate(products) if item["id"] == product_id), None)
-            if index is None:
-                json_response(self, {"error": "Product not found"}, 404)
-                return
-            products[index] = normalize_product(read_json(self), existing_id=product_id)
-            save_products(products)
-            json_response(self, products[index])
-        except (ValueError, json.JSONDecodeError) as error:
-            json_response(self, {"error": str(error)}, 400)
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    payload = request.get_json() or {}
 
-    def do_DELETE(self):
-        path = urlparse(self.path).path
-        product_id = path.removeprefix("/api/products/")
-        if not product_id or product_id == path:
-            json_response(self, {"error": "Not found"}, 404)
-            return
-        if not self.is_admin():
-            return
+    if hmac.compare_digest(
+        str(payload.get("password", "")),
+        ADMIN_PASSWORD
+    ):
+        return jsonify({
+            "token": make_token()
+        })
+
+    return jsonify({
+        "error": "Invalid admin password"
+    }), 401
+
+
+@app.route("/api/products", methods=["POST"])
+def add_product():
+    token = request.headers.get("X-Admin-Token", "")
+
+    if not verify_token(token):
+        return jsonify({
+            "error": "Admin login required"
+        }), 401
+
+    try:
+        product = normalize_product(
+            request.get_json() or {}
+        )
 
         products = load_products()
-        remaining = [item for item in products if item["id"] != product_id]
-        if len(remaining) == len(products):
-            json_response(self, {"error": "Product not found"}, 404)
-            return
-        save_products(remaining)
-        json_response(self, {"deleted": product_id})
 
-    def is_admin(self):
-        token = self.headers.get("X-Admin-Token", "")
-        if verify_token(token):
-            return True
-        json_response(self, {"error": "Admin login required"}, 401)
-        return False
+        products.insert(0, product)
+
+        save_products(products)
+
+        return jsonify(product), 201
+
+    except (ValueError, json.JSONDecodeError) as error:
+        return jsonify({
+            "error": str(error)
+        }), 400
+
+
+@app.route("/api/products/<product_id>", methods=["PUT"])
+def update_product(product_id):
+    token = request.headers.get("X-Admin-Token", "")
+
+    if not verify_token(token):
+        return jsonify({
+            "error": "Admin login required"
+        }), 401
+
+    try:
+        products = load_products()
+
+        index = next(
+            (
+                position
+                for position, item in enumerate(products)
+                if item["id"] == product_id
+            ),
+            None
+        )
+
+        if index is None:
+            return jsonify({
+                "error": "Product not found"
+            }), 404
+
+        products[index] = normalize_product(
+            request.get_json() or {},
+            existing_id=product_id
+        )
+
+        save_products(products)
+
+        return jsonify(products[index])
+
+    except (ValueError, json.JSONDecodeError) as error:
+        return jsonify({
+            "error": str(error)
+        }), 400
+
+
+@app.route("/api/products/<product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    token = request.headers.get("X-Admin-Token", "")
+
+    if not verify_token(token):
+        return jsonify({
+            "error": "Admin login required"
+        }), 401
+
+    products = load_products()
+
+    remaining = [
+        item for item in products
+        if item["id"] != product_id
+    ]
+
+    if len(remaining) == len(products):
+        return jsonify({
+            "error": "Product not found"
+        }), 404
+
+    save_products(remaining)
+
+    return jsonify({
+        "deleted": product_id
+    })
 
 
 def run():
     ensure_data_file()
-    host = os.environ.get("HOST", "127.0.0.1")
+
+    host = "0.0.0.0"
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer((host, port), LinunauraHandler)
+
     print(f"Linunaura backend running at http://{host}:{port}")
     print(f"Admin password: {ADMIN_PASSWORD}")
-    server.serve_forever()
+
+    app.run(host=host, port=port)
 
 
 if __name__ == "__main__":
