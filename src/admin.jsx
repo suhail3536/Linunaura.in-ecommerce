@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import './styles.css';
+// Admin.jsx
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+import React, { useEffect, useState } from 'react';
+
+const API_URL = "https://linunaura-in-ecommerce.onrender.com/api";
 
 const emptyProduct = {
   name: '',
@@ -24,12 +24,16 @@ function money(value) {
   return `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
 }
 
-function AdminApp() {
+export default function AdminApp() {
   const [products, setProducts] = useState([]);
-  const [token, setToken] = useState(localStorage.getItem('linunaura_token') || '');
+  const [token, setToken] = useState(
+    localStorage.getItem('linunaura_token') || ''
+  );
+
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [editing, setEditing] = useState(null);
+
   const [form, setForm] = useState(emptyProduct);
 
   async function loadProducts() {
@@ -43,18 +47,34 @@ function AdminApp() {
 
   async function login(event) {
     event.preventDefault();
-    setMessage('');
+
     try {
-      const response = await fetch(`${API_URL}/admin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
+      const response = await fetch(
+        `${API_URL}/admin/login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ password })
+        }
+      );
+
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Login failed');
-      localStorage.setItem('linunaura_token', payload.token);
+
+      if (!response.ok) {
+        throw new Error(payload.error);
+      }
+
+      localStorage.setItem(
+        'linunaura_token',
+        payload.token
+      );
+
       setToken(payload.token);
+
       setPassword('');
+
     } catch (err) {
       setMessage(err.message);
     }
@@ -65,24 +85,26 @@ function AdminApp() {
     setToken('');
   }
 
+  function updateField(field, value) {
+    setForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
   function startEdit(product) {
     setEditing(product.id);
     setForm({ ...product });
-    setMessage('');
   }
 
   function startNew() {
     setEditing(null);
     setForm(emptyProduct);
-    setMessage('');
-  }
-
-  function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
   }
 
   async function saveProduct(event) {
     event.preventDefault();
+
     const payload = {
       ...form,
       price: Number(form.price),
@@ -91,7 +113,11 @@ function AdminApp() {
       rating: Number(form.rating || 4.7),
       featured: Boolean(form.featured)
     };
-    const url = editing ? `${API_URL}/products/${editing}` : `${API_URL}/products`;
+
+    const url = editing
+      ? `${API_URL}/products/${editing}`
+      : `${API_URL}/products`;
+
     const method = editing ? 'PUT' : 'POST';
 
     try {
@@ -103,29 +129,56 @@ function AdminApp() {
         },
         body: JSON.stringify(payload)
       });
+
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Unable to save product');
-      const successMessage = editing ? 'Product updated.' : 'Product added.';
+
+      if (!response.ok) {
+        throw new Error(result.error);
+      }
+
+      setMessage(
+        editing
+          ? 'Product updated'
+          : 'Product added'
+      );
+
       startNew();
-      setMessage(successMessage);
-      await loadProducts();
+
+      loadProducts();
+
     } catch (err) {
       setMessage(err.message);
     }
   }
 
   async function deleteProduct(product) {
-    const confirmed = window.confirm(`Delete ${product.name}?`);
+    const confirmed = window.confirm(
+      `Delete ${product.name}?`
+    );
+
     if (!confirmed) return;
+
     try {
-      const response = await fetch(`${API_URL}/products/${product.id}`, {
-        method: 'DELETE',
-        headers: { 'X-Admin-Token': token }
-      });
+      const response = await fetch(
+        `${API_URL}/products/${product.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'X-Admin-Token': token
+          }
+        }
+      );
+
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Unable to delete product');
-      setMessage('Product deleted.');
-      await loadProducts();
+
+      if (!response.ok) {
+        throw new Error(result.error);
+      }
+
+      setMessage('Product deleted');
+
+      loadProducts();
+
     } catch (err) {
       setMessage(err.message);
     }
@@ -134,194 +187,159 @@ function AdminApp() {
   if (!token) {
     return (
       <div className="app-shell">
-        <AdminHeader />
-        <main className="admin-login">
+        <div style={{ padding: 40 }}>
+          <h1>Admin Login</h1>
+
           <form onSubmit={login}>
-            <p className="eyebrow">Separate admin webpage</p>
-            <h1>Manage Linunaura.in products</h1>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Default: linunaura123"
-                required
-              />
-            </label>
-            {message && <div className="notice error">{message}</div>}
-            <button>Sign in</button>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
+            />
+
+            <button type="submit">
+              Login
+            </button>
           </form>
-        </main>
+
+          {message && <p>{message}</p>}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <AdminHeader logout={logout} />
-      <main className="admin-workspace">
-        <section className="admin-table">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Admin panel</p>
-              <h1>Products and prices</h1>
-            </div>
-            <button onClick={startNew}>New item</button>
-          </div>
-          {message && <div className="notice">{message}</div>}
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <div className="table-product">
-                        <img src={product.image} alt="" />
-                        <span>{product.name}</span>
-                      </div>
-                    </td>
-                    <td>{product.category}</td>
-                    <td>{money(product.price)}</td>
-                    <td>{product.stock}</td>
-                    <td>
-                      <div className="action-row">
-                        <button onClick={() => startEdit(product)}>Edit</button>
-                        <button className="danger" onClick={() => deleteProduct(product)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      <div style={{ padding: 20 }}>
+        <h1>Admin Panel</h1>
 
-        <ProductForm
-          form={form}
-          editing={editing}
-          updateField={updateField}
-          saveProduct={saveProduct}
-          cancel={startNew}
-        />
-      </main>
+        <button onClick={logout}>
+          Logout
+        </button>
+
+        <hr />
+
+        <form onSubmit={saveProduct}>
+          <input
+            placeholder="Name"
+            value={form.name}
+            onChange={(e) =>
+              updateField('name', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Category"
+            value={form.category}
+            onChange={(e) =>
+              updateField('category', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Price"
+            type="number"
+            value={form.price}
+            onChange={(e) =>
+              updateField('price', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Stock"
+            type="number"
+            value={form.stock}
+            onChange={(e) =>
+              updateField('stock', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Color"
+            value={form.color}
+            onChange={(e) =>
+              updateField('color', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Size"
+            value={form.size}
+            onChange={(e) =>
+              updateField('size', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Material"
+            value={form.material}
+            onChange={(e) =>
+              updateField('material', e.target.value)
+            }
+          />
+
+          <input
+            placeholder="Image URL"
+            value={form.image}
+            onChange={(e) =>
+              updateField('image', e.target.value)
+            }
+          />
+
+          <textarea
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) =>
+              updateField('description', e.target.value)
+            }
+          />
+
+          <button type="submit">
+            {editing ? 'Update' : 'Add'} Product
+          </button>
+        </form>
+
+        <hr />
+
+        <h2>Products</h2>
+
+        {products.map((product) => (
+          <div
+            key={product.id}
+            style={{
+              border: '1px solid gray',
+              padding: 10,
+              marginBottom: 10
+            }}
+          >
+            <img
+              src={product.image}
+              alt=""
+              width="100"
+            />
+
+            <h3>{product.name}</h3>
+
+            <p>{money(product.price)}</p>
+
+            <button
+              onClick={() => startEdit(product)}
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => deleteProduct(product)}
+              style={{ marginLeft: 10 }}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
-
-function AdminHeader({ logout }) {
-  return (
-    <header className="admin-header">
-      <a className="brand" href="/">
-        <span className="brand-mark">L</span>
-        <span>
-          <strong>Linunaura.in</strong>
-          <small>Admin panel</small>
-        </span>
-      </a>
-      <div className="admin-header-actions">
-        <a href="/">View website</a>
-        {logout && <button onClick={logout}>Logout</button>}
-      </div>
-    </header>
-  );
-}
-
-function ProductForm({ form, editing, updateField, saveProduct, cancel }) {
-  return (
-    <form className="product-form" onSubmit={saveProduct}>
-      <div className="section-heading compact">
-        <div>
-          <p className="eyebrow">{editing ? 'Update item' : 'Add item'}</p>
-          <h2>{editing ? 'Edit bedsheet' : 'New bedsheet'}</h2>
-        </div>
-      </div>
-
-      <label>
-        Product name
-        <input value={form.name} onChange={(event) => updateField('name', event.target.value)} required />
-      </label>
-      <div className="two-col">
-        <label>
-          Category
-          <input value={form.category} onChange={(event) => updateField('category', event.target.value)} required />
-        </label>
-        <label>
-          Badge
-          <input value={form.badge} onChange={(event) => updateField('badge', event.target.value)} />
-        </label>
-      </div>
-      <div className="two-col">
-        <label>
-          Price
-          <input type="number" min="0" value={form.price} onChange={(event) => updateField('price', event.target.value)} required />
-        </label>
-        <label>
-          MRP
-          <input type="number" min="0" value={form.mrp} onChange={(event) => updateField('mrp', event.target.value)} />
-        </label>
-      </div>
-      <div className="two-col">
-        <label>
-          Stock
-          <input type="number" min="0" value={form.stock} onChange={(event) => updateField('stock', event.target.value)} required />
-        </label>
-        <label>
-          Size
-          <select value={form.size} onChange={(event) => updateField('size', event.target.value)}>
-            <option>Single</option>
-            <option>Double</option>
-            <option>Queen</option>
-            <option>King</option>
-            <option>Super King</option>
-          </select>
-        </label>
-      </div>
-      <div className="two-col">
-        <label>
-          Material
-          <input value={form.material} onChange={(event) => updateField('material', event.target.value)} required />
-        </label>
-        <label>
-          Color
-          <input value={form.color} onChange={(event) => updateField('color', event.target.value)} required />
-        </label>
-      </div>
-      <label>
-        Image URL
-        <input value={form.image} onChange={(event) => updateField('image', event.target.value)} required />
-      </label>
-      <label>
-        Description
-        <textarea value={form.description} onChange={(event) => updateField('description', event.target.value)} required />
-      </label>
-      <label className="check-row">
-        <input
-          type="checkbox"
-          checked={form.featured}
-          onChange={(event) => updateField('featured', event.target.checked)}
-        />
-        Feature on homepage
-      </label>
-      <div className="form-actions">
-        <button type="submit">{editing ? 'Update item' : 'Add item'}</button>
-        <button type="button" onClick={cancel} className="secondary">
-          Clear
-        </button>
-      </div>
-    </form>
-  );
-}
-
-createRoot(document.getElementById('root')).render(<AdminApp />);
