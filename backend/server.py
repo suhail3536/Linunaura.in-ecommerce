@@ -235,20 +235,19 @@ def get_products():
 
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
-    payload = request.get_json() or {}
 
-    if hmac.compare_digest(
-        str(payload.get("password", "")),
-        ADMIN_PASSWORD
-    ):
+    data = request.get_json()
+
+    password = data.get("password")
+
+    if password != "linunaura123":
         return jsonify({
-            "token": make_token()
-        })
+            "error": "Invalid password"
+        }), 401
 
     return jsonify({
-        "error": "Invalid admin password"
-    }), 401
-
+        "token": "admin-token"
+    })
 
 @app.route("/api/products", methods=["POST"])
 def add_product():
