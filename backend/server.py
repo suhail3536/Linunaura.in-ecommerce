@@ -1,6 +1,5 @@
 from pathlib import Path
 from flask import Flask, request, jsonify
-
 from flask_cors import CORS
 import hashlib
 import hmac
