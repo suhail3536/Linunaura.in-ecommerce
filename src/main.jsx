@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import AdminApp from './Admin.jsx';
 
+createRoot(document.getElementById('root')).render(<App />);
+
 const API_URL = "https://linunaura-in-ecommerce.onrender.com/api";
 
 function money(value) {
