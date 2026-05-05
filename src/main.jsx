@@ -3,7 +3,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
-import AdminApp from './Admin';
+import AdminApp from './Admin.jsx';
 
 const API_URL = "https://linunaura-in-ecommerce.onrender.com/api";
 
