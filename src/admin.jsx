@@ -1,4 +1,4 @@
-// Admin.jsx
+/// src/Admin.jsx
 
 import React, { useEffect, useState } from 'react';
 
@@ -25,20 +25,35 @@ function money(value) {
 }
 
 export default function AdminApp() {
+
   const [products, setProducts] = useState([]);
+
   const [token, setToken] = useState(
     localStorage.getItem('linunaura_token') || ''
   );
 
   const [password, setPassword] = useState('');
+
   const [message, setMessage] = useState('');
+
   const [editing, setEditing] = useState(null);
 
   const [form, setForm] = useState(emptyProduct);
 
   async function loadProducts() {
-    const response = await fetch(`${API_URL}/products`);
-    setProducts(await response.json());
+    try {
+
+      const response = await fetch(
+        `${API_URL}/products`
+      );
+
+      const data = await response.json();
+
+      setProducts(data);
+
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   useEffect(() => {
@@ -46,24 +61,32 @@ export default function AdminApp() {
   }, []);
 
   async function login(event) {
+
     event.preventDefault();
 
     try {
+
       const response = await fetch(
         `${API_URL}/admin/login`,
         {
           method: 'POST',
+
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ password })
+
+          body: JSON.stringify({
+            password
+          })
         }
       );
 
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error);
+        throw new Error(
+          payload.error || 'Login failed'
+        );
       }
 
       localStorage.setItem(
@@ -75,17 +98,25 @@ export default function AdminApp() {
 
       setPassword('');
 
+      setMessage('Login successful');
+
     } catch (err) {
+
       setMessage(err.message);
     }
   }
 
   function logout() {
-    localStorage.removeItem('linunaura_token');
+
+    localStorage.removeItem(
+      'linunaura_token'
+    );
+
     setToken('');
   }
 
   function updateField(field, value) {
+
     setForm((current) => ({
       ...current,
       [field]: value
@@ -93,16 +124,23 @@ export default function AdminApp() {
   }
 
   function startEdit(product) {
+
     setEditing(product.id);
-    setForm({ ...product });
+
+    setForm({
+      ...product
+    });
   }
 
   function startNew() {
+
     setEditing(null);
+
     setForm(emptyProduct);
   }
 
   async function saveProduct(event) {
+
     event.preventDefault();
 
     const payload = {
@@ -118,22 +156,30 @@ export default function AdminApp() {
       ? `${API_URL}/products/${editing}`
       : `${API_URL}/products`;
 
-    const method = editing ? 'PUT' : 'POST';
+    const method = editing
+      ? 'PUT'
+      : 'POST';
 
     try {
+
       const response = await fetch(url, {
+
         method,
+
         headers: {
           'Content-Type': 'application/json',
           'X-Admin-Token': token
         },
+
         body: JSON.stringify(payload)
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error);
+        throw new Error(
+          result.error || 'Save failed'
+        );
       }
 
       setMessage(
@@ -147,11 +193,13 @@ export default function AdminApp() {
       loadProducts();
 
     } catch (err) {
+
       setMessage(err.message);
     }
   }
 
   async function deleteProduct(product) {
+
     const confirmed = window.confirm(
       `Delete ${product.name}?`
     );
@@ -159,10 +207,12 @@ export default function AdminApp() {
     if (!confirmed) return;
 
     try {
+
       const response = await fetch(
         `${API_URL}/products/${product.id}`,
         {
           method: 'DELETE',
+
           headers: {
             'X-Admin-Token': token
           }
@@ -172,7 +222,9 @@ export default function AdminApp() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error);
+        throw new Error(
+          result.error || 'Delete failed'
+        );
       }
 
       setMessage('Product deleted');
@@ -180,20 +232,25 @@ export default function AdminApp() {
       loadProducts();
 
     } catch (err) {
+
       setMessage(err.message);
     }
   }
 
   if (!token) {
+
     return (
       <div className="app-shell">
+
         <div style={{ padding: 40 }}>
+
           <h1>Admin Login</h1>
 
           <form onSubmit={login}>
+
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Enter password"
               value={password}
               onChange={(e) =>
                 setPassword(e.target.value)
@@ -203,17 +260,24 @@ export default function AdminApp() {
             <button type="submit">
               Login
             </button>
+
           </form>
 
-          {message && <p>{message}</p>}
+          {message && (
+            <p>{message}</p>
+          )}
+
         </div>
       </div>
     );
   }
 
   return (
+
     <div className="app-shell">
+
       <div style={{ padding: 20 }}>
+
         <h1>Admin Panel</h1>
 
         <button onClick={logout}>
@@ -223,11 +287,15 @@ export default function AdminApp() {
         <hr />
 
         <form onSubmit={saveProduct}>
+
           <input
-            placeholder="Name"
+            placeholder="Product Name"
             value={form.name}
             onChange={(e) =>
-              updateField('name', e.target.value)
+              updateField(
+                'name',
+                e.target.value
+              )
             }
           />
 
@@ -235,25 +303,46 @@ export default function AdminApp() {
             placeholder="Category"
             value={form.category}
             onChange={(e) =>
-              updateField('category', e.target.value)
+              updateField(
+                'category',
+                e.target.value
+              )
             }
           />
 
           <input
-            placeholder="Price"
             type="number"
+            placeholder="Price"
             value={form.price}
             onChange={(e) =>
-              updateField('price', e.target.value)
+              updateField(
+                'price',
+                e.target.value
+              )
             }
           />
 
           <input
-            placeholder="Stock"
             type="number"
+            placeholder="MRP"
+            value={form.mrp}
+            onChange={(e) =>
+              updateField(
+                'mrp',
+                e.target.value
+              )
+            }
+          />
+
+          <input
+            type="number"
+            placeholder="Stock"
             value={form.stock}
             onChange={(e) =>
-              updateField('stock', e.target.value)
+              updateField(
+                'stock',
+                e.target.value
+              )
             }
           />
 
@@ -261,7 +350,10 @@ export default function AdminApp() {
             placeholder="Color"
             value={form.color}
             onChange={(e) =>
-              updateField('color', e.target.value)
+              updateField(
+                'color',
+                e.target.value
+              )
             }
           />
 
@@ -269,7 +361,10 @@ export default function AdminApp() {
             placeholder="Size"
             value={form.size}
             onChange={(e) =>
-              updateField('size', e.target.value)
+              updateField(
+                'size',
+                e.target.value
+              )
             }
           />
 
@@ -277,7 +372,10 @@ export default function AdminApp() {
             placeholder="Material"
             value={form.material}
             onChange={(e) =>
-              updateField('material', e.target.value)
+              updateField(
+                'material',
+                e.target.value
+              )
             }
           />
 
@@ -285,7 +383,10 @@ export default function AdminApp() {
             placeholder="Image URL"
             value={form.image}
             onChange={(e) =>
-              updateField('image', e.target.value)
+              updateField(
+                'image',
+                e.target.value
+              )
             }
           />
 
@@ -293,52 +394,72 @@ export default function AdminApp() {
             placeholder="Description"
             value={form.description}
             onChange={(e) =>
-              updateField('description', e.target.value)
+              updateField(
+                'description',
+                e.target.value
+              )
             }
           />
 
           <button type="submit">
-            {editing ? 'Update' : 'Add'} Product
+
+            {editing
+              ? 'Update Product'
+              : 'Add Product'}
+
           </button>
+
         </form>
 
         <hr />
 
-        <h2>Products</h2>
+        <h2>All Products</h2>
 
         {products.map((product) => (
+
           <div
             key={product.id}
             style={{
-              border: '1px solid gray',
+              border: '1px solid #ccc',
               padding: 10,
               marginBottom: 10
             }}
           >
+
             <img
               src={product.image}
-              alt=""
+              alt={product.name}
               width="100"
             />
 
             <h3>{product.name}</h3>
 
-            <p>{money(product.price)}</p>
+            <p>
+              {money(product.price)}
+            </p>
 
             <button
-              onClick={() => startEdit(product)}
+              onClick={() =>
+                startEdit(product)
+              }
             >
               Edit
             </button>
 
             <button
-              onClick={() => deleteProduct(product)}
-              style={{ marginLeft: 10 }}
+              onClick={() =>
+                deleteProduct(product)
+              }
+              style={{
+                marginLeft: 10
+              }}
             >
               Delete
             </button>
+
           </div>
         ))}
+
       </div>
     </div>
   );
