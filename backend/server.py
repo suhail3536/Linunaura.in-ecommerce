@@ -1,11 +1,14 @@
 from pathlib import Path
 from flask import Flask, request, jsonify
+
+from flask_cors import CORS
 import hashlib
 import hmac
 import json
 import os
 import time
 import uuid
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -16,6 +19,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "linunaura-local-secret")
 TOKEN_TTL_SECONDS = 60 * 60 * 8
 
 app = Flask(__name__)
+CORS(app)
 
 SEED_PRODUCTS = [
     {
