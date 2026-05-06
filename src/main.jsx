@@ -1,15 +1,12 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import './styles.css';
+import React from "react";
+import ReactDOM from "react-dom/client";
 
-import AdminApp from './Admin.jsx';
-import App from './App.jsx';
-
-function Router() {
-  if (window.location.pathname === '/admin') {
-    return <AdminApp />;
-  }
-  return <App />;
+function App() {
+  return <h1>Linunaura</h1>;
 }
 
-createRoot(document.getElementById('root')).render(<Router />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
